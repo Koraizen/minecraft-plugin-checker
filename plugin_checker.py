@@ -479,8 +479,6 @@ class PluginUpdateChecker:
         
         all_updates = []
         
-        # check_all parametresini kaldır, hep False
-        
         # SpigotMC
         print("📦 SpigotMC kontrol ediliyor...")
         spigot_updates = self.check_spigot_recent_updates()
@@ -493,17 +491,17 @@ class PluginUpdateChecker:
         all_updates.extend(modrinth_updates)
         print(f"   → {len(modrinth_updates)} yeni güncelleme\n")
         
-        # Polymart
-        print("🟣 Polymart kontrol ediliyor...")
-        polymart_updates = self.check_polymart_recent_updates()
-        all_updates.extend(polymart_updates)
-        print(f"   → {len(polymart_updates)} yeni güncelleme\n")
+        # Polymart - ŞİMDİLİK DEVRE DIŞI (API çalışmıyor)
+        # print("🟣 Polymart kontrol ediliyor...")
+        # polymart_updates = self.check_polymart_recent_updates()
+        # all_updates.extend(polymart_updates)
+        # print(f"   → {len(polymart_updates)} yeni güncelleme\n")
         
-        # BuiltByBit
-        print("🟤 BuiltByBit kontrol ediliyor...")
-        builtbybit_updates = self.check_builtbybit_recent_updates()
-        all_updates.extend(builtbybit_updates)
-        print(f"   → {len(builtbybit_updates)} yeni güncelleme\n")
+        # BuiltByBit - ŞİMDİLİK DEVRE DIŞI (API çalışmıyor)
+        # print("🟤 BuiltByBit kontrol ediliyor...")
+        # builtbybit_updates = self.check_builtbybit_recent_updates()
+        # all_updates.extend(builtbybit_updates)
+        # print(f"   → {len(builtbybit_updates)} yeni güncelleme\n")
         
         # GitHub (sadece takip edilenler)
         print("⚫ GitHub kontrol ediliyor...")
@@ -542,8 +540,8 @@ class PluginUpdateChecker:
         print(f"   • Kontrol aralığı: {interval_minutes} dakika")
         print(f"   • Takip edilen plugin: {len(self.tracked_plugin_names)} adet")
         print(f"   • GitHub repos: {len(self.github_repos)} adet")
-        print(f"   • Platformlar: SpigotMC, Modrinth, Polymart, BuiltByBit, GitHub")
-        print(f"   • Mod: Sadece takip edilen pluginler (her kontrolde)")
+        print(f"   • Aktif platformlar: SpigotMC, Modrinth, GitHub")
+        print(f"   • Not: Polymart ve BuiltByBit public API'leri mevcut değil")
         print(f"\n🚀 Bot başlatıldı! İlk kontrol yapılıyor...\n")
         
         while True:
@@ -568,7 +566,7 @@ class PluginUpdateChecker:
 
 if __name__ == "__main__":
     # Environment variable'dan veya doğrudan koddan webhook al
-    WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL') or "https://discord.com/api/webhooks/1458667439578550324/mHVrQsiUFUUtXY76Dp_M260VXhizaWklTbFA7UZOEaHXafjHR-WjrkCswIXB8IgnTybP"
+    WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL') or "https://discord.com/api/webhooks/1458675898650984539/La_MIQTt0PUo55J4cCWqSBnn2jKizh5pucXvVMt73k1kH-tACIpMpJzzDz1Fdz-aLiK5"
     
     if not WEBHOOK_URL or WEBHOOK_URL == "BURAYA_WEBHOOK_URL_YAPISTIR":
         print("\n⚠ HATA: Discord Webhook URL'i ayarlanmamış!\n")
