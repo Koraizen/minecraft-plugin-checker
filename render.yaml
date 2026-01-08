@@ -1,0 +1,22 @@
+services:
+  - type: worker
+    name: plugin-update-checker
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python plugin_checker.py
+    envVars:
+      - key: DISCORD_WEBHOOK_URL
+        sync: false
+      - key: PYTHONUNBUFFERED
+        value: "1"
+```
+
+#### 📄 `.gitignore`
+```
+__pycache__/
+*.py[cod]
+plugin_versions.json
+.vscode/
+.idea/
+.DS_Store
+.env
