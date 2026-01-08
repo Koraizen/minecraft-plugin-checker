@@ -107,17 +107,16 @@ class PluginUpdateChecker:
         return False
 
     def should_check_all_plugins(self) -> bool:
-        """İlk çalıştırmada veya her 5 kontrolde bir tüm pluginleri kontrol et"""
+        """Her zaman sadece takip edilen pluginleri kontrol et"""
         self.check_counter += 1
-        # İlk çalıştırmada veya her 5 kontrolde bir
-        return self.is_first_run or (self.check_counter % 5 == 0)
+        return False  # Artık hiçbir zaman tüm pluginleri kontrol etme
 
     def check_spigot_recent_updates(self, check_all: bool = False) -> List[Dict]:
         """SpigotMC'deki son güncellemeleri kontrol et (Spiget API)"""
         updates = []
         
         try:
-            print(f"   📡 SpigotMC (Spiget API) sorgulanıyor... (Mod: {'Tümü' if check_all else 'Takip edilenler'})")
+            print(f"   📡 SpigotMC (Spiget API) sorgulanıyor...")
             
             api_url = "https://api.spiget.org/v2/resources?size=100&sort=-updateDate"
             response = requests.get(api_url, timeout=15)
@@ -134,8 +133,8 @@ class PluginUpdateChecker:
                     
                     checked += 1
                     
-                    # Takip edilen veya tümünü kontrol et
-                    if check_all or self.is_tracked_plugin(plugin_name):
+                    # Sadece takip edilen pluginleri kontrol et
+                    if self.is_tracked_plugin(plugin_name):
                         found_tracked += 1
                         
                         version_info = self.get_spigot_version(resource_id)
@@ -158,7 +157,7 @@ class PluginUpdateChecker:
                         
                         time.sleep(0.2)
                 
-                print(f"   → {checked} plugin kontrol edildi, {found_tracked} işlendi")
+                print(f"   → {checked} plugin kontrol edildi, {found_tracked} takip edilen bulundu")
                 
             else:
                 print(f"   ✗ Spiget API hatası: Status {response.status_code}")
@@ -186,7 +185,7 @@ class PluginUpdateChecker:
         updates = []
         
         try:
-            print(f"   📡 Modrinth API sorgulanıyor... (Mod: {'Tümü' if check_all else 'Takip edilenler'})")
+            print(f"   📡 Modrinth API sorgulanıyor...")
             
             url = "https://api.modrinth.com/v2/search"
             params = {
@@ -204,7 +203,7 @@ class PluginUpdateChecker:
                     plugin_name = project.get('title', '')
                     slug = project.get('slug', '')
                     
-                    if check_all or self.is_tracked_plugin(plugin_name):
+                    if self.is_tracked_plugin(plugin_name):
                         versions_url = f"https://api.modrinth.com/v2/project/{slug}/version"
                         versions_response = requests.get(versions_url, timeout=10)
                         
@@ -242,44 +241,58 @@ class PluginUpdateChecker:
         updates = []
         
         try:
-            print(f"   📡 Polymart API sorgulanıyor... (Mod: {'Tümü' if check_all else 'Takip edilenler'})")
+            print(f"   📡 Polymart API sorgulanıyor...")
             
-            # Polymart'ın yeni güncellenenleri almak için
+            # Polymart API v1 endpoint
             url = "https://api.polymart.org/v1/getResources"
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            }
             params = {
-                "sort": "updated",
-                "per_page": 50
+                "sort": "date_updated",
+                "per_page": 50,
+                "page": 1
             }
             
-            response = requests.get(url, params=params, timeout=15)
+            response = requests.get(url, params=params, headers=headers, timeout=15)
             
             if response.status_code == 200:
-                data = response.json()
-                
-                if data.get('response', {}).get('resources'):
-                    for resource in data['response']['resources']:
-                        plugin_name = resource.get('title', '')
-                        resource_id = str(resource.get('resource_id', ''))
-                        version = resource.get('version', 'Unknown')
-                        
-                        if check_all or self.is_tracked_plugin(plugin_name):
-                            update_key = f"polymart_{resource_id}_{version}"
+                try:
+                    data = response.json()
+                    resources = data.get('response', {}).get('resources', [])
+                    
+                    if resources:
+                        for resource in resources[:50]:  # İlk 50 tane
+                            plugin_name = resource.get('title', '')
+                            resource_id = str(resource.get('resource_id', ''))
+                            version = resource.get('version', 'Unknown')
                             
-                            if update_key not in self.seen_updates:
-                                self.seen_updates[update_key] = datetime.now(timezone.utc).isoformat()
+                            if self.is_tracked_plugin(plugin_name):
+                                update_key = f"polymart_{resource_id}_{version}"
                                 
-                                updates.append({
-                                    "name": plugin_name,
-                                    "platform": "Polymart",
-                                    "version": version,
-                                    "url": f"https://polymart.org/resource/{resource_id}",
-                                    "color": 15418782,  # Pembe
-                                })
-                                
-                                print(f"   ✓ Yeni güncelleme: {plugin_name} v{version}")
+                                if update_key not in self.seen_updates:
+                                    self.seen_updates[update_key] = datetime.now(timezone.utc).isoformat()
+                                    
+                                    updates.append({
+                                        "name": plugin_name,
+                                        "platform": "Polymart",
+                                        "version": version,
+                                        "url": f"https://polymart.org/resource/{resource_id}",
+                                        "color": 15418782,  # Pembe
+                                    })
+                                    
+                                    print(f"   ✓ Yeni güncelleme: {plugin_name} v{version}")
+                    else:
+                        print(f"   ⚠ Polymart'tan veri alınamadı (boş yanıt)")
+                except json.JSONDecodeError:
+                    print(f"   ⚠ Polymart API yanıtı okunamadı (JSON hatası)")
+            else:
+                print(f"   ⚠ Polymart API erişilemiyor (Status: {response.status_code})")
                 
+        except requests.exceptions.Timeout:
+            print(f"   ⚠ Polymart API zaman aşımı")
         except Exception as e:
-            print(f"   ✗ Polymart hatası: {e}")
+            print(f"   ⚠ Polymart şu an kullanılamıyor: {e}")
         
         return updates
 
@@ -288,44 +301,63 @@ class PluginUpdateChecker:
         updates = []
         
         try:
-            print(f"   📡 BuiltByBit API sorgulanıyor... (Mod: {'Tümü' if check_all else 'Takip edilenler'})")
+            print(f"   📡 BuiltByBit API sorgulanıyor...")
             
-            # BuiltByBit API (eski MC-Market)
+            # BuiltByBit API v1 (eski MC-Market)
             url = "https://api.builtbybit.com/v1/resources"
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            }
             params = {
                 "sort": "-last_update",
                 "size": 50
             }
             
-            response = requests.get(url, params=params, timeout=15)
+            response = requests.get(url, params=params, headers=headers, timeout=15)
             
             if response.status_code == 200:
-                data = response.json()
-                
-                if data.get('data'):
-                    for resource in data['data']:
-                        plugin_name = resource.get('title', '')
-                        resource_id = str(resource.get('id', ''))
-                        version = resource.get('current_version', {}).get('name', 'Unknown')
-                        
-                        if check_all or self.is_tracked_plugin(plugin_name):
-                            update_key = f"builtbybit_{resource_id}_{version}"
+                try:
+                    data = response.json()
+                    resources = data.get('data', [])
+                    
+                    if resources:
+                        for resource in resources:
+                            plugin_name = resource.get('title', '')
+                            resource_id = str(resource.get('id', ''))
                             
-                            if update_key not in self.seen_updates:
-                                self.seen_updates[update_key] = datetime.now(timezone.utc).isoformat()
+                            # Version bilgisi farklı yerlerde olabilir
+                            version_data = resource.get('current_version', {})
+                            if isinstance(version_data, dict):
+                                version = version_data.get('name', 'Unknown')
+                            else:
+                                version = str(version_data) if version_data else 'Unknown'
+                            
+                            if self.is_tracked_plugin(plugin_name):
+                                update_key = f"builtbybit_{resource_id}_{version}"
                                 
-                                updates.append({
-                                    "name": plugin_name,
-                                    "platform": "BuiltByBit",
-                                    "version": version,
-                                    "url": f"https://builtbybit.com/resources/{resource_id}/",
-                                    "color": 3066993,  # Koyu yeşil
-                                })
-                                
-                                print(f"   ✓ Yeni güncelleme: {plugin_name} v{version}")
+                                if update_key not in self.seen_updates:
+                                    self.seen_updates[update_key] = datetime.now(timezone.utc).isoformat()
+                                    
+                                    updates.append({
+                                        "name": plugin_name,
+                                        "platform": "BuiltByBit",
+                                        "version": version,
+                                        "url": f"https://builtbybit.com/resources/{resource_id}/",
+                                        "color": 3066993,  # Koyu yeşil
+                                    })
+                                    
+                                    print(f"   ✓ Yeni güncelleme: {plugin_name} v{version}")
+                    else:
+                        print(f"   ⚠ BuiltByBit'ten veri alınamadı (boş yanıt)")
+                except json.JSONDecodeError:
+                    print(f"   ⚠ BuiltByBit API yanıtı okunamadı (JSON hatası)")
+            else:
+                print(f"   ⚠ BuiltByBit API erişilemiyor (Status: {response.status_code})")
                 
+        except requests.exceptions.Timeout:
+            print(f"   ⚠ BuiltByBit API zaman aşımı")
         except Exception as e:
-            print(f"   ✗ BuiltByBit hatası: {e}")
+            print(f"   ⚠ BuiltByBit şu an kullanılamıyor: {e}")
         
         return updates
 
@@ -438,40 +470,38 @@ class PluginUpdateChecker:
         print(f"\n{'='*70}")
         print(f"🔍 Kontrol başladı: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
-        # İlk çalıştırma veya her 5 kontrolde bir tümünü kontrol et
-        check_all = self.should_check_all_plugins()
         if self.is_first_run:
-            print(f"🎉 İLK ÇALIŞTIRMA - TÜM GÜNCEL PLUGİNLER AKTARILIYOR!")
-        elif check_all:
-            print(f"🎯 Mod: TÜM PLUGİNLER (#{self.check_counter}. kontrol)")
+            print(f"🎉 İLK ÇALIŞTIRMA - TAKİP EDİLEN PLUGİNLER AKTARILIYOR!")
         else:
-            print(f"🎯 Mod: TAKİP EDİLENLER (#{self.check_counter}. kontrol)")
+            print(f"🎯 Kontrol #{self.check_counter + 1} - Takip Edilen Pluginler")
         
         print(f"{'='*70}\n")
         
         all_updates = []
         
+        # check_all parametresini kaldır, hep False
+        
         # SpigotMC
         print("📦 SpigotMC kontrol ediliyor...")
-        spigot_updates = self.check_spigot_recent_updates(check_all)
+        spigot_updates = self.check_spigot_recent_updates()
         all_updates.extend(spigot_updates)
         print(f"   → {len(spigot_updates)} yeni güncelleme\n")
         
         # Modrinth
         print("🟢 Modrinth kontrol ediliyor...")
-        modrinth_updates = self.check_modrinth_recent_updates(check_all)
+        modrinth_updates = self.check_modrinth_recent_updates()
         all_updates.extend(modrinth_updates)
         print(f"   → {len(modrinth_updates)} yeni güncelleme\n")
         
         # Polymart
         print("🟣 Polymart kontrol ediliyor...")
-        polymart_updates = self.check_polymart_recent_updates(check_all)
+        polymart_updates = self.check_polymart_recent_updates()
         all_updates.extend(polymart_updates)
         print(f"   → {len(polymart_updates)} yeni güncelleme\n")
         
         # BuiltByBit
         print("🟤 BuiltByBit kontrol ediliyor...")
-        builtbybit_updates = self.check_builtbybit_recent_updates(check_all)
+        builtbybit_updates = self.check_builtbybit_recent_updates()
         all_updates.extend(builtbybit_updates)
         print(f"   → {len(builtbybit_updates)} yeni güncelleme\n")
         
@@ -513,17 +543,14 @@ class PluginUpdateChecker:
         print(f"   • Takip edilen plugin: {len(self.tracked_plugin_names)} adet")
         print(f"   • GitHub repos: {len(self.github_repos)} adet")
         print(f"   • Platformlar: SpigotMC, Modrinth, Polymart, BuiltByBit, GitHub")
-        print(f"   • Mod: Her 5 kontrolde bir TÜM pluginleri tara")
+        print(f"   • Mod: Sadece takip edilen pluginler (her kontrolde)")
         print(f"\n🚀 Bot başlatıldı! İlk kontrol yapılıyor...\n")
         
         while True:
             try:
                 self.check_all_updates()
                 
-                next_check = self.check_counter + 1
-                next_mode = "TÜM PLUGİNLER" if next_check % 5 == 0 else "TAKİP EDİLENLER"
-                
-                print(f"⏰ Sonraki kontrol: {interval_minutes} dakika sonra (#{next_check} - {next_mode})")
+                print(f"⏰ Sonraki kontrol: {interval_minutes} dakika sonra")
                 print(f"💤 Bekleniyor...\n")
                 
                 time.sleep(interval_minutes * 60)
@@ -540,10 +567,8 @@ class PluginUpdateChecker:
 
 
 if __name__ == "__main__":
-    # ═══════════════════════════════════════════════════════════
-    # 🔧 BURAYA DISCORD WEBHOOK URL'İNİ YAPIŞTIRIN
-    # ═══════════════════════════════════════════════════════════
-    WEBHOOK_URL = "https://discord.com/api/webhooks/1458675898650984539/La_MIQTt0PUo55J4cCWqSBnn2jKizh5pucXvVMt73k1kH-tACIpMpJzzDz1Fdz-aLiK5"
+    # Environment variable'dan veya doğrudan koddan webhook al
+    WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL') or "https://discord.com/api/webhooks/1458667439578550324/mHVrQsiUFUUtXY76Dp_M260VXhizaWklTbFA7UZOEaHXafjHR-WjrkCswIXB8IgnTybP"
     
     if not WEBHOOK_URL or WEBHOOK_URL == "BURAYA_WEBHOOK_URL_YAPISTIR":
         print("\n⚠ HATA: Discord Webhook URL'i ayarlanmamış!\n")
@@ -552,7 +577,7 @@ if __name__ == "__main__":
         print("   2. Kanal Ayarları → Entegrasyonlar → Webhook'lar")
         print("   3. 'Yeni Webhook' butonuna tıkla")
         print("   4. Webhook URL'ini kopyala")
-        print("   5. Koda yapıştır (WEBHOOK_URL değişkenine)\n")
+        print("   5. Render.com'da Environment Variables'a ekle\n")
     else:
         checker = PluginUpdateChecker(WEBHOOK_URL)
         checker.run(interval_minutes=30)  # Her 30 dakikada kontrol et
