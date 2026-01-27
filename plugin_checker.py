@@ -612,7 +612,7 @@ class PluginUpdateChecker:
 
 if __name__ == "__main__":
     # Discord Webhook URL'iniz
-    WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL') or "https://discord.com/api/webhooks/1458675898650984539/La_MIQTt0PUo55J4cCWqSBnn2jKizh5pucXvVMt73k1kH-tACIpMpJzzDz1Fdz-aLiK5"
+    WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL') or "https://discord.com/api/webhooks/1465553053284307078/HJw7uPSX4G4jb1GkbRWkVFtsxHcWUX37KWvcfEoZm5XanHqw9gPAbeREpeNHUOPOcjOE"
     
     if not WEBHOOK_URL or WEBHOOK_URL == "BURAYA_WEBHOOK_URL_YAPISTIR":
         print("\n╔════════════════════════════════════════════════════════════╗")
